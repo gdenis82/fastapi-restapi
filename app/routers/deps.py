@@ -1,5 +1,6 @@
-from fastapi import Header, HTTPException, status
-from app.core.config import settings
+from fastapi import Depends, Header, HTTPException, status
+
+from app.core.config import Settings, settings_dep
 from app.db.session import SessionLocal
 
 
@@ -8,6 +9,12 @@ async def get_db():
         yield db
 
 
-def verify_api_key(x_api_key: str | None = Header(None, alias="X-API-Key")):
+db_dep = Depends(get_db)
+
+
+def verify_api_key(
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+    settings: Settings = settings_dep,
+):
     if not x_api_key or x_api_key != settings.api_key:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")

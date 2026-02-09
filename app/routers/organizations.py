@@ -8,7 +8,7 @@ from sqlalchemy.orm import aliased, selectinload
 from app.models.activity import Activity
 from app.models.building import Building
 from app.models.organization import Organization, organization_activity
-from app.routers.deps import get_db, verify_api_key
+from app.routers.deps import db_dep, verify_api_key
 from app.schemas.organization import OrganizationOut
 
 router = APIRouter(prefix="/organizations", tags=["organizations"], dependencies=[Depends(verify_api_key)])
@@ -38,7 +38,7 @@ async def _activity_descendants(session: AsyncSession, activity_id: int) -> list
     summary="Организации в здании",
     description="Возвращает все организации, находящиеся в указанном здании.",
 )
-async def list_by_building(building_id: int, db: AsyncSession = Depends(get_db)):
+async def list_by_building(building_id: int, db: AsyncSession = db_dep):
     stmt = _with_details(select(Organization).where(Organization.building_id == building_id))
     result = await db.scalars(stmt.order_by(Organization.id))
     return result.all()
@@ -50,7 +50,7 @@ async def list_by_building(building_id: int, db: AsyncSession = Depends(get_db))
     summary="Организации по деятельности",
     description="Возвращает организации, относящиеся к указанному виду деятельности.",
 )
-async def list_by_activity(activity_id: int, db: AsyncSession = Depends(get_db)):
+async def list_by_activity(activity_id: int, db: AsyncSession = db_dep):
     stmt = (
         select(Organization)
         .join(organization_activity)
@@ -67,7 +67,7 @@ async def list_by_activity(activity_id: int, db: AsyncSession = Depends(get_db))
     summary="Организации по дереву деятельности",
     description="Возвращает организации по виду деятельности и всем вложенным уровням.",
 )
-async def list_by_activity_tree(activity_id: int, db: AsyncSession = Depends(get_db)):
+async def list_by_activity_tree(activity_id: int, db: AsyncSession = db_dep):
     activity_ids = await _activity_descendants(db, activity_id)
     if not activity_ids:
         return []
@@ -91,7 +91,7 @@ async def list_by_activity_tree(activity_id: int, db: AsyncSession = Depends(get
 async def list_by_activity_name(
     name: str = Query(..., min_length=1),
     include_children: bool = Query(True),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_dep,
 ):
     activity_result = await db.scalars(select(Activity).where(Activity.name == name))
     activity = activity_result.first()
@@ -117,7 +117,7 @@ async def list_by_activity_name(
     summary="Поиск организации по названию",
     description="Возвращает организации, название которых содержит указанную строку.",
 )
-async def search_by_name(name: str = Query(..., min_length=1), db: AsyncSession = Depends(get_db)):
+async def search_by_name(name: str = Query(..., min_length=1), db: AsyncSession = db_dep):
     stmt = _with_details(select(Organization).where(Organization.name.ilike(f"%{name}%")))
     result = await db.scalars(stmt.order_by(Organization.id))
     return result.all()
@@ -133,7 +133,7 @@ async def list_nearby(
     lat: float = Query(...),
     lon: float = Query(...),
     radius_km: float = Query(..., gt=0),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_dep,
 ):
     lat_delta = radius_km / 111
     lon_delta = radius_km / (111 * max(math.cos(math.radians(lat)), 0.01))
@@ -163,7 +163,7 @@ async def list_within_rect(
     max_lat: float = Query(...),
     min_lon: float = Query(...),
     max_lon: float = Query(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = db_dep,
 ):
     stmt = (
         select(Organization)
@@ -188,7 +188,7 @@ async def list_within_rect(
     summary="Информация об организации",
     description="Возвращает карточку организации по идентификатору.",
 )
-async def get_organization(organization_id: int, db: AsyncSession = Depends(get_db)):
+async def get_organization(organization_id: int, db: AsyncSession = db_dep):
     stmt = _with_details(select(Organization).where(Organization.id == organization_id))
     result = await db.scalars(stmt)
     organization = result.first()

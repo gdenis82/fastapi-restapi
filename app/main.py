@@ -4,7 +4,7 @@ import time
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from app.core.config import settings
+from app.core.config import get_settings
 from app.core.logging import build_request_context, configure_logging, sanitize_value
 from app.routers.buildings import router as buildings_router
 from app.routers.deps import verify_api_key
@@ -13,6 +13,7 @@ from app.routers.organizations import router as organizations_router
 configure_logging()
 logger = logging.getLogger("app")
 
+settings = get_settings()
 is_production = settings.ENVIRONMENT.lower() == "production"
 
 docs_url = None if is_production else "/docs"
