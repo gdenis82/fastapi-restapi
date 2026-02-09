@@ -1,5 +1,11 @@
+import logging
+from functools import lru_cache
+
+from fastapi import Depends
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger("app.settings")
 
 
 class Settings(BaseSettings):
@@ -17,7 +23,24 @@ class Settings(BaseSettings):
             return value.replace("postgresql://", "postgresql+asyncpg://", 1)
         if value.startswith("postgresql+asyncpg://"):
             return value
-        raise ValueError("DATABASE_URL must use postgresql or postgresql+asyncpg scheme")
+        raise ValueError("DATABASE_URL must use postgresql+asyncpg scheme")
 
 
-settings = Settings()
+class SettingsBuilder:
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def build() -> "Settings":
+        try:
+            instance = Settings()
+        except Exception as exc:
+            logger.error("Error loading settings: %s", type(exc).__name__)
+            raise
+        return instance
+
+
+def get_settings() -> "Settings":
+    return SettingsBuilder.build()
+
+
+settings_dep = Depends(get_settings)
+settings = get_settings()
