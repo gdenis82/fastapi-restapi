@@ -37,6 +37,7 @@ async def request_logging_middleware(request: Request, call_next):
     try:
         response = await call_next(request)
     except Exception as exc:
+        # Перевод длительности запроса из секунд в миллисекунды.
         duration_ms = (time.monotonic() - start_time) * 1000
         logger.error(
             "Request failed: %s %s -> exception=%s duration_ms=%.2f context=%s",
@@ -47,6 +48,7 @@ async def request_logging_middleware(request: Request, call_next):
             context,
         )
         raise
+    # Перевод длительности запроса из секунд в миллисекунды.
     duration_ms = (time.monotonic() - start_time) * 1000
     logger.info(
         "Request completed: %s %s -> %s duration_ms=%.2f context=%s",
@@ -78,7 +80,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     logger.exception("Unhandled exception: context=%s", context)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
-@app.get("/")
+@app.get("/", dependencies=[Depends(verify_api_key)])
 def root():
     return {"message": "Organizations Directory API"}
 
