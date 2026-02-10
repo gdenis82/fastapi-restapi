@@ -1,20 +1,27 @@
 import logging
 from functools import lru_cache
+from pathlib import Path
 
 from fastapi import Depends
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger("app.settings")
 
 
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        case_sensitive=True,
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
-    api_key: str = None
-    database_url: str = None
+    API_KEY: str | None = Field(default=None, validation_alias="API_KEY")
+    DATABASE_URL: str | None = Field(default=None, validation_alias="DATABASE_URL")
+    ENVIRONMENT: str = Field(default="development", validation_alias="ENVIRONMENT")
 
-    @field_validator("database_url", mode="before")
+    @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def assemble_db_connection(cls, value: str) -> str:
         if not value:
