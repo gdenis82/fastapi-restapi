@@ -48,5 +48,6 @@ def get_settings() -> "Settings":
     return SettingsBuilder.build()
 
 
+# settings_dep: для внедрения зависимостей FastAPI (берется из DI), settings: прямой вызов для использования вне DI.
 settings_dep = Depends(get_settings)
 settings = get_settings()
