@@ -1,0 +1,54 @@
+# Test API endpoints
+
+@host = http://127.0.0.1:8000
+@api_key = changeme
+
+### Health - проверка доступности
+GET {{host}}/health
+X-API-Key: {{api_key}}
+Accept: application/json
+
+### Buildings - список зданий
+GET {{host}}/buildings
+X-API-Key: {{api_key}}
+Accept: application/json
+
+### Organization by id - информация об организации
+GET {{host}}/organizations/1
+X-API-Key: {{api_key}}
+Accept: application/json
+
+### Organizations by building - организации в здании
+GET {{host}}/organizations/by-building/1
+X-API-Key: {{api_key}}
+Accept: application/json
+
+### Organizations by activity id -  организации по виду деятельности
+GET {{host}}/organizations/by-activity/3
+X-API-Key: {{api_key}}
+Accept: application/json
+
+### Organizations by activity tree - организации по дереву деятельности
+GET {{host}}/organizations/by-activity-tree/1
+X-API-Key: {{api_key}}
+Accept: application/json
+
+### Organizations by activity name (url-encoded) - поиск по названию деятельности
+GET {{host}}/organizations/by-activity-name?name=Мясная продукция&include_children=true
+X-API-Key: {{api_key}}
+Accept: application/json
+
+### Organizations search by name - поиск организаций по названию
+GET {{host}}/organizations/search?name=Мясной Дом
+X-API-Key: {{api_key}}
+Accept: application/json
+
+### Organizations near a point - организации в радиусе
+GET {{host}}/organizations/near?lat=55.76&lon=37.63&radius_km=10
+X-API-Key: {{api_key}}
+Accept: application/json
+
+### Organizations within a rectangle - организации в прямоугольной области
+GET {{host}}/organizations/within-rect?min_lat=55.7&max_lat=55.8&min_lon=37.5&max_lon=37.7
+X-API-Key: {{api_key}}
+Accept: application/json
