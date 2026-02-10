@@ -18,7 +18,7 @@ async def test_list_buildings(client, auth_headers, seed_data):
     response = await client.get("/buildings", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 3
+    assert len(data) == 8
 
 
 @pytest.mark.asyncio
@@ -35,7 +35,11 @@ async def test_by_building(client, auth_headers, seed_data):
     response = await client.get(f"/organizations/by-building/{building_id}", headers=auth_headers)
     assert response.status_code == 200
     ids = {item["id"] for item in response.json()}
-    assert ids == {seed_data["organizations"]["org2"], seed_data["organizations"]["org4"]}
+    assert ids == {
+        seed_data["organizations"]["org2"],
+        seed_data["organizations"]["org4"],
+        seed_data["organizations"]["org7"],
+    }
 
 
 @pytest.mark.asyncio
@@ -44,7 +48,12 @@ async def test_by_activity(client, auth_headers, seed_data):
     response = await client.get(f"/organizations/by-activity/{activity_id}", headers=auth_headers)
     assert response.status_code == 200
     ids = {item["id"] for item in response.json()}
-    assert ids == {seed_data["organizations"]["org1"], seed_data["organizations"]["org2"]}
+    assert ids == {
+        seed_data["organizations"]["org1"],
+        seed_data["organizations"]["org2"],
+        seed_data["organizations"]["org5"],
+        seed_data["organizations"]["org9"],
+    }
 
 
 @pytest.mark.asyncio
@@ -53,7 +62,16 @@ async def test_by_activity_tree(client, auth_headers, seed_data):
     response = await client.get(f"/organizations/by-activity-tree/{activity_id}", headers=auth_headers)
     assert response.status_code == 200
     ids = {item["id"] for item in response.json()}
-    assert ids == {seed_data["organizations"]["org1"], seed_data["organizations"]["org2"]}
+    assert ids == {
+        seed_data["organizations"]["org1"],
+        seed_data["organizations"]["org2"],
+        seed_data["organizations"]["org5"],
+        seed_data["organizations"]["org6"],
+        seed_data["organizations"]["org7"],
+        seed_data["organizations"]["org8"],
+        seed_data["organizations"]["org9"],
+        seed_data["organizations"]["org10"],
+    }
 
 
 @pytest.mark.asyncio
@@ -65,7 +83,16 @@ async def test_by_activity_name(client, auth_headers, seed_data):
     )
     assert response.status_code == 200
     ids = {item["id"] for item in response.json()}
-    assert ids == {seed_data["organizations"]["org1"], seed_data["organizations"]["org2"]}
+    assert ids == {
+        seed_data["organizations"]["org1"],
+        seed_data["organizations"]["org2"],
+        seed_data["organizations"]["org5"],
+        seed_data["organizations"]["org6"],
+        seed_data["organizations"]["org7"],
+        seed_data["organizations"]["org8"],
+        seed_data["organizations"]["org9"],
+        seed_data["organizations"]["org10"],
+    }
 
 
 @pytest.mark.asyncio
@@ -89,6 +116,12 @@ async def test_nearby(client, auth_headers, seed_data):
         seed_data["organizations"]["org1"],
         seed_data["organizations"]["org2"],
         seed_data["organizations"]["org4"],
+        seed_data["organizations"]["org5"],
+        seed_data["organizations"]["org6"],
+        seed_data["organizations"]["org7"],
+        seed_data["organizations"]["org8"],
+        seed_data["organizations"]["org9"],
+        seed_data["organizations"]["org10"],
     }
 
 
@@ -105,6 +138,12 @@ async def test_within_rect(client, auth_headers, seed_data):
         seed_data["organizations"]["org1"],
         seed_data["organizations"]["org2"],
         seed_data["organizations"]["org4"],
+        seed_data["organizations"]["org5"],
+        seed_data["organizations"]["org6"],
+        seed_data["organizations"]["org7"],
+        seed_data["organizations"]["org8"],
+        seed_data["organizations"]["org9"],
+        seed_data["organizations"]["org10"],
     }
 
 
