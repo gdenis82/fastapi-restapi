@@ -50,7 +50,7 @@ async def client(session_maker, dependency_overrides):
 
     def override_get_settings():
         base_settings = get_settings()
-        return base_settings.model_copy(update={"api_key": "test-key"})
+        return base_settings.model_copy(update={"API_KEY": "test-key"})
 
     dependency_overrides({get_db: override_get_db, get_settings: override_get_settings})
     transport = ASGITransport(app=app)

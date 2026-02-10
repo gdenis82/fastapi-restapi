@@ -9,7 +9,7 @@ from app.main import app
 async def test_get_settings_dependency_override(dependency_overrides):
     def override_get_settings():
         base_settings = get_settings()
-        return base_settings.model_copy(update={"api_key": "override-key"})
+        return base_settings.model_copy(update={"API_KEY": "override-key"})
 
     dependency_overrides({get_settings: override_get_settings})
     transport = ASGITransport(app=app)
