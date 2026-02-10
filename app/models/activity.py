@@ -1,5 +1,5 @@
 from sqlalchemy import CheckConstraint, ForeignKey, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.db.base import Base
 
@@ -16,3 +16,13 @@ class Activity(Base):
     parent = relationship("Activity", remote_side=[id], back_populates="children")
     children = relationship("Activity", back_populates="parent", cascade="all, delete-orphan")
     organizations = relationship("Organization", secondary="organization_activity", back_populates="activities")
+
+    @validates("parent")
+    def _validate_parent(self, _key, parent):
+        if parent is None:
+            return parent
+        if parent.depth >= 3:
+            raise ValueError("Activity nesting depth cannot exceed 3")
+        # Глубина ребенка на один уровень ниже глубины родителя.
+        self.depth = parent.depth + 1
+        return parent
