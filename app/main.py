@@ -16,9 +16,9 @@ logger = logging.getLogger("app")
 settings = get_settings()
 is_production = settings.ENVIRONMENT.lower() == "production"
 
-docs_url = None if is_production else "/docs"
-redoc_url = None if is_production else "/redoc"
-openapi_url = None if is_production else f"{settings.API_V1_STR}/openapi.json"
+docs_url = None if is_production else f"/docs"
+redoc_url = None if is_production else f"/redoc"
+openapi_url = None if is_production else f"/openapi.json"
 app = FastAPI(title="Organizations Directory API",
               debug=not is_production,
               openapi_url=openapi_url,
