@@ -2,7 +2,7 @@ services:
   api:
     container_name: api
     build: .
-    restart: always
+    restart: unless-stopped
     ports:
       - "8000:8000"
     env_file:
@@ -16,7 +16,7 @@ services:
   db:
     container_name: db
     image: postgres:16-alpine
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_DB: app
       POSTGRES_USER: app
@@ -36,7 +36,7 @@ services:
   adminer:
     container_name: adminer
     image: adminer
-    restart: always
+    restart: unless-stopped
     ports:
       - "8089:8080"
     depends_on:
