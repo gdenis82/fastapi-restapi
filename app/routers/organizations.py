@@ -1,14 +1,20 @@
 import math
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Select, and_, select
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import Select, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 
+from app.core.exceptions import (
+    ActivityNotFound,
+    InvalidCoordinates,
+    OrganizationNotFound,
+)
 from app.models.activity import Activity
 from app.models.building import Building
 from app.models.organization import Organization, organization_activity
-from app.routers.deps import db_dep, verify_api_key
+from app.routers.deps import db_dep, pagination_dep, verify_api_key
+from app.schemas.common import PageParams, PaginatedResponse
 from app.schemas.organization import OrganizationOut
 
 router = APIRouter(prefix="/organizations", tags=["organizations"], dependencies=[Depends(verify_api_key)])
@@ -50,57 +56,107 @@ async def _activity_descendants(session: AsyncSession, activity_id: int) -> list
 
 @router.get(
     "/by-building/{building_id}",
-    response_model=list[OrganizationOut],
+    response_model=PaginatedResponse[OrganizationOut],
     summary="Организации в здании",
     description="Возвращает все организации, находящиеся в указанном здании.",
 )
-async def list_by_building(building_id: int, db: AsyncSession = db_dep):
-    stmt = _with_details(select(Organization).where(Organization.building_id == building_id))
-    result = await db.scalars(stmt.order_by(Organization.id))
-    return result.all()
+async def list_by_building(
+    building_id: int,
+    db: AsyncSession = db_dep,
+    pagination: PageParams = Depends(pagination_dep),
+):
+    base_stmt = select(Organization).where(Organization.building_id == building_id)
+    count_stmt = select(func.count()).select_from(base_stmt.subquery())
+    total = await db.scalar(count_stmt) or 0
+
+    stmt = _with_details(base_stmt).order_by(Organization.id)
+    stmt = stmt.limit(pagination.size).offset((pagination.page - 1) * pagination.size)
+    result = await db.scalars(stmt)
+    items = list(result.all())
+
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=pagination.page,
+        size=pagination.size,
+        pages=math.ceil(total / pagination.size) if total > 0 else 0,
+    )
 
 
 @router.get(
     "/by-activity/{activity_id}",
-    response_model=list[OrganizationOut],
+    response_model=PaginatedResponse[OrganizationOut],
     summary="Организации по деятельности",
     description="Возвращает организации, относящиеся к указанному виду деятельности.",
 )
-async def list_by_activity(activity_id: int, db: AsyncSession = db_dep):
-    stmt = (
+async def list_by_activity(
+    activity_id: int,
+    db: AsyncSession = db_dep,
+    pagination: PageParams = Depends(pagination_dep),
+):
+    base_stmt = (
         select(Organization)
         .join(organization_activity)
         .where(organization_activity.c.activity_id == activity_id)
     )
-    stmt = _with_details(stmt)
-    result = await db.scalars(stmt.order_by(Organization.id))
-    return result.all()
+    count_stmt = select(func.count()).select_from(base_stmt.subquery())
+    total = await db.scalar(count_stmt) or 0
+
+    stmt = _with_details(base_stmt).order_by(Organization.id)
+    stmt = stmt.limit(pagination.size).offset((pagination.page - 1) * pagination.size)
+    result = await db.scalars(stmt)
+    items = list(result.all())
+
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=pagination.page,
+        size=pagination.size,
+        pages=math.ceil(total / pagination.size) if total > 0 else 0,
+    )
 
 
 @router.get(
     "/by-activity-tree/{activity_id}",
-    response_model=list[OrganizationOut],
+    response_model=PaginatedResponse[OrganizationOut],
     summary="Организации по дереву деятельности",
     description="Возвращает организации по виду деятельности и всем вложенным уровням.",
 )
-async def list_by_activity_tree(activity_id: int, db: AsyncSession = db_dep):
+async def list_by_activity_tree(
+    activity_id: int,
+    db: AsyncSession = db_dep,
+    pagination: PageParams = Depends(pagination_dep),
+):
     activity_ids = await _activity_descendants(db, activity_id)
     if not activity_ids:
-        return []
-    stmt = (
+        return PaginatedResponse(items=[], total=0, page=pagination.page, size=pagination.size, pages=0)
+
+    base_stmt = (
         select(Organization)
         .join(organization_activity)
         .where(organization_activity.c.activity_id.in_(activity_ids))
         .distinct()
     )
-    stmt = _with_details(stmt)
-    result = await db.scalars(stmt.order_by(Organization.id))
-    return result.all()
+    count_stmt = select(func.count()).select_from(base_stmt.subquery())
+    total = await db.scalar(count_stmt) or 0
+
+    stmt = _with_details(base_stmt).order_by(Organization.id)
+    stmt = stmt.limit(pagination.size).offset((pagination.page - 1) * pagination.size)
+    result = await db.scalars(stmt)
+    items = list(result.all())
+
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=pagination.page,
+        size=pagination.size,
+        pages=math.ceil(total / pagination.size) if total > 0 else 0,
+    )
 
 
 @router.get(
     "/by-activity-name",
-    response_model=list[OrganizationOut],
+    response_model=PaginatedResponse[OrganizationOut],
     summary="Организации по названию деятельности",
     description="Ищет организации по названию деятельности. Можно включить вложенные уровни.",
 )
@@ -108,40 +164,72 @@ async def list_by_activity_name(
     name: str = Query(..., min_length=1),
     include_children: bool = Query(True),
     db: AsyncSession = db_dep,
+    pagination: PageParams = Depends(pagination_dep),
 ):
     activity_result = await db.scalars(select(Activity).where(Activity.name == name))
     activity = activity_result.first()
     if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
+        raise ActivityNotFound()
+
     activity_ids = [activity.id]
     if include_children:
         activity_ids = await _activity_descendants(db, activity.id)
-    stmt = (
+
+    base_stmt = (
         select(Organization)
         .join(organization_activity)
         .where(organization_activity.c.activity_id.in_(activity_ids))
         .distinct()
     )
-    stmt = _with_details(stmt)
-    result = await db.scalars(stmt.order_by(Organization.id))
-    return result.all()
+    count_stmt = select(func.count()).select_from(base_stmt.subquery())
+    total = await db.scalar(count_stmt) or 0
+
+    stmt = _with_details(base_stmt).order_by(Organization.id)
+    stmt = stmt.limit(pagination.size).offset((pagination.page - 1) * pagination.size)
+    result = await db.scalars(stmt)
+    items = list(result.all())
+
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=pagination.page,
+        size=pagination.size,
+        pages=math.ceil(total / pagination.size) if total > 0 else 0,
+    )
 
 
 @router.get(
     "/search",
-    response_model=list[OrganizationOut],
+    response_model=PaginatedResponse[OrganizationOut],
     summary="Поиск организации по названию",
     description="Возвращает организации, название которых содержит указанную строку.",
 )
-async def search_by_name(name: str = Query(..., min_length=1), db: AsyncSession = db_dep):
-    stmt = _with_details(select(Organization).where(Organization.name.ilike(f"%{name}%")))
-    result = await db.scalars(stmt.order_by(Organization.id))
-    return result.all()
+async def search_by_name(
+    name: str = Query(..., min_length=1),
+    db: AsyncSession = db_dep,
+    pagination: PageParams = Depends(pagination_dep),
+):
+    base_stmt = select(Organization).where(Organization.name.ilike(f"%{name}%"))
+    count_stmt = select(func.count()).select_from(base_stmt.subquery())
+    total = await db.scalar(count_stmt) or 0
+
+    stmt = _with_details(base_stmt).order_by(Organization.id)
+    stmt = stmt.limit(pagination.size).offset((pagination.page - 1) * pagination.size)
+    result = await db.scalars(stmt)
+    items = list(result.all())
+
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=pagination.page,
+        size=pagination.size,
+        pages=math.ceil(total / pagination.size) if total > 0 else 0,
+    )
 
 
 @router.get(
     "/near",
-    response_model=list[OrganizationOut],
+    response_model=PaginatedResponse[OrganizationOut],
     summary="Организации в радиусе",
     description="Возвращает организации, которые находятся в заданном радиусе от точки.",
 )
@@ -150,11 +238,12 @@ async def list_nearby(
     lon: float = Query(...),
     radius_km: float = Query(..., gt=0),
     db: AsyncSession = db_dep,
+    pagination: PageParams = Depends(pagination_dep),
 ):
     # Приблизительный перевод радиуса в градусы широты/долготы для первичного отбора.
     lat_delta = radius_km / 111
     lon_delta = radius_km / (111 * max(math.cos(math.radians(lat)), 0.01))
-    stmt = (
+    base_stmt = (
         select(Organization)
         .join(Building)
         .where(
@@ -164,19 +253,33 @@ async def list_nearby(
             )
         )
     )
-    stmt = _with_details(stmt)
-    result = await db.scalars(stmt.order_by(Organization.id))
+    stmt = _with_details(base_stmt).order_by(Organization.id)
+    # добавим пагинацию к результату.
+    result = await db.scalars(stmt)
     candidates = result.all()
-    return [
+    filtered = [
         org
         for org in candidates
         if _haversine_km(lat, lon, org.building.latitude, org.building.longitude) <= radius_km
     ]
+    
+    total = len(filtered)
+    start = (pagination.page - 1) * pagination.size
+    end = start + pagination.size
+    items = filtered[start:end]
+
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=pagination.page,
+        size=pagination.size,
+        pages=math.ceil(total / pagination.size) if total > 0 else 0,
+    )
 
 
 @router.get(
     "/within-rect",
-    response_model=list[OrganizationOut],
+    response_model=PaginatedResponse[OrganizationOut],
     summary="Организации в прямоугольной области",
     description="Возвращает организации, чьи здания попадают в заданный прямоугольник.",
 )
@@ -186,8 +289,9 @@ async def list_within_rect(
     min_lon: float = Query(...),
     max_lon: float = Query(...),
     db: AsyncSession = db_dep,
+    pagination: PageParams = Depends(pagination_dep),
 ):
-    stmt = (
+    base_stmt = (
         select(Organization)
         .join(Building)
         .where(
@@ -199,9 +303,21 @@ async def list_within_rect(
             )
         )
     )
-    stmt = _with_details(stmt)
-    result = await db.scalars(stmt.order_by(Organization.id))
-    return result.all()
+    count_stmt = select(func.count()).select_from(base_stmt.subquery())
+    total = await db.scalar(count_stmt) or 0
+
+    stmt = _with_details(base_stmt).order_by(Organization.id)
+    stmt = stmt.limit(pagination.size).offset((pagination.page - 1) * pagination.size)
+    result = await db.scalars(stmt)
+    items = list(result.all())
+
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=pagination.page,
+        size=pagination.size,
+        pages=math.ceil(total / pagination.size) if total > 0 else 0,
+    )
 
 
 @router.get(
@@ -215,5 +331,5 @@ async def get_organization(organization_id: int, db: AsyncSession = db_dep):
     result = await db.scalars(stmt)
     organization = result.first()
     if not organization:
-        raise HTTPException(status_code=404, detail="Organization not found")
+        raise OrganizationNotFound()
     return organization
