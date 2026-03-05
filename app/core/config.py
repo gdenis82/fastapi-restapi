@@ -14,11 +14,19 @@ class Settings(BaseSettings):
         case_sensitive=True,
         env_file=".env",
         env_file_encoding="utf-8",
+        extra="ignore",
     )
 
-    API_KEY: str | None = Field(default=None, validation_alias="API_KEY")
+    API_KEYS: set[str] = Field(default_factory=set, validation_alias="API_KEYS")
     DATABASE_URL: str | None = Field(default=None, validation_alias="DATABASE_URL")
     ENVIRONMENT: str = Field(default="development", validation_alias="ENVIRONMENT")
+
+    @field_validator("API_KEYS", mode="before")
+    @classmethod
+    def assemble_api_keys(cls, value: str | list[str] | set[str]) -> set[str]:
+        if isinstance(value, str):
+            return {key.strip() for key in value.split(",") if key.strip()}
+        return set(value)
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
